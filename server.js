@@ -4,7 +4,6 @@ const cors = require('cors')
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
 
-
 require('dotenv').config()
 
 app.use(cors())
@@ -70,7 +69,6 @@ const User = mongoose.model("users", userSchema);
 
 // Listen to username input
 app.post("/api/users", async (req, res) => {
-  console.log(req.body.username);
   const userName = req.body.username;
 
   createUser(req.body.username);
@@ -132,8 +130,10 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
     });
 });
 
-app.get("/api/users/:_id/logs", async (req, res) => {
+//  GET /api/users/:_id/logs?[&from][&to][&limit]
+app.get("/api/users/:_id/logs&:from?&:to?&:limit?", async (req, res) => {
   let _id = req.params["_id"];
+  console.log(req.params);
   let userLog;
   let userUsername;
 
@@ -144,10 +144,10 @@ app.get("/api/users/:_id/logs", async (req, res) => {
   });
 
   await res.json({
-    "username" : userUsername,
-    "_id" : _id,
-    "count" : userLog.length,
-    "log" : userLog
+    username : userUsername,
+    _id : _id,
+    count : userLog.length,
+    log : userLog
   });
 });
 
