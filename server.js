@@ -48,10 +48,21 @@ const userSchema = new Schema({
   count: {
     type: Number, 
     default: 0},
-  log : {
-    type: [logSchema]
-  }
+  log : [{
+    description: {
+      type: String,
+      required: true
+    },
+    duration: {
+      type: Number,
+      required: true
+    },
+    date: {
+      type: Date
+    }
+  }]
 });
+
 
 
 // Create instance of new schema
@@ -85,7 +96,8 @@ app.get("/api/users", (req, res) => {
 });
 
 app.post("/api/users/:_id/exercises", (req, res) => {
-  let _id = req.body._id;
+  let _id = req.body[":_id"];
+  console.log(_id);
   let exercise = {};
 
   exercise["description"] = req.body.description;
@@ -101,12 +113,13 @@ app.post("/api/users/:_id/exercises", (req, res) => {
     if (err) return console.log(err);
 
     // Add new exercise
+    console.log(user.username);
     user.log.push(exercise);
+    console.log(user.log);
 
     // Save the updated user
     user.save((err, updatedUser) => {
       if (err) return console.log(err);
-      done(null, updatedUser);
     });
   });
 
