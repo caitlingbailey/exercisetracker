@@ -63,7 +63,6 @@ const userSchema = new Schema({
 });
 
 
-
 // Create instance of new schema
 const User = mongoose.model("users", userSchema);
 
@@ -108,7 +107,24 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
   };
 
   await User.findById(_id, (err, user) => {
-    if (err) return console.log(err);
+    if (err) { 
+      console.log(err);
+      res.status(400)
+      res.json({
+        success: false,
+        err
+      });
+    };
+
+    if (!user) {
+      res.status(404);
+      res.json({
+        success: false,
+        message: `Cannot find an User with the userId: ${userId}`
+        });
+      res.end();
+      return
+    }
     user_username = user.username;
 
     // Add new exercise
