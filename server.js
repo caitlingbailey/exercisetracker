@@ -95,27 +95,26 @@ app.get("/api/users", (req, res) => {
   });
 });
 
-app.post("/api/users/:_id/exercises", (req, res) => {
+app.post("/api/users/:_id/exercises", async (req, res) => {
   let _id = req.body[":_id"];
-  console.log(_id);
   let exercise = {};
+  let user_username;
 
   exercise["description"] = req.body.description;
   exercise["duration"] = req.body.duration;
+
   if (req.body.date === '') {
     exercise["date"] = new Date();
-    console.log(exercise["date"]);
   } else {
     exercise["date"] = req.body.date;
   };
 
-  User.findById(_id, (err, user) => {
+  await User.findById(_id, (err, user) => {
     if (err) return console.log(err);
+    user_username = user.username;
 
     // Add new exercise
-    console.log(user.username);
     user.log.push(exercise);
-    console.log(user.log);
 
     // Save the updated user
     user.save((err, updatedUser) => {
@@ -124,16 +123,33 @@ app.post("/api/users/:_id/exercises", (req, res) => {
   });
 
   // Return user object with exercise fields added
-  userObject = {
-    "username" : "placeholder",
-    "_id" : req.body.id,
+  await res.json({
+    "username" : user_username,
+    "_id" : _id,
     "date" : exercise["date"],
     "duration" : exercise["duration"],
-    "description" : exercise["description"]}
-  res.json(userObject);
+    "description" : exercise["description"]
+    });
 });
 
+app.get("/api/users/:_id/logs", async (req, res) => {
+  let _id = req.params["_id"];
+  let userLog;
+  let userUsername;
 
+  await User.findById(_id, (err, user) => {
+    if (err) return console.log(err);
+    userLog = user.log;
+    userUsername = user.username;
+  });
+
+  await res.json({
+    "username" : userUsername,
+    "_id" : _id,
+    "count" : userLog.length,
+    "log" : userLog
+  });
+});
 
 // Method to create new URL
 const createUser = async (userName, done) => {
