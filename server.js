@@ -3,6 +3,8 @@ const app = express()
 const cors = require('cors')
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
+const moment = require('moment'); 
+
 
 require('dotenv').config()
 
@@ -84,7 +86,10 @@ app.get("/api/users", (req, res) => {
     let userArray = [];
     users.forEach((user) => {
       userObject = {};
-      userObject[user.username] = user._id;
+      userObject["_id"] = user._id;
+      userObject["username"] = user.username;
+      userObject["__v"] = user.__v;
+      // userObject[user.username] = user._id;
       userArray.push(userObject);
     });
     console.log(userArray);
@@ -101,9 +106,9 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
   exercise["duration"] = req.body.duration;
 
   if (req.body.date === '') {
-    exercise["date"] = new Date();
+    exercise["date"] = moment().format('DDD MMMM DD YYYY');
   } else {
-    exercise["date"] = req.body.date;
+    exercise["date"] = moment(req.body.date).format('DDD MMMM DD YYYY');
   };
 
   await User.findById(_id, (err, user) => {
@@ -120,7 +125,7 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
       res.status(404);
       res.json({
         success: false,
-        message: `Cannot find an User with the userId: ${userId}`
+        message: `Cannot find an User with the userId`
         });
       res.end();
       return
