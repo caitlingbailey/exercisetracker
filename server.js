@@ -74,7 +74,6 @@ app.post("/api/users", async (req, res) => {
 
   createUser(req.body.username);
   let query = await User.findOne({username : userName});
-  console.log(query._id.toString());
 
   res.json({
     username : userName,
@@ -89,29 +88,52 @@ app.get("/api/users", (req, res) => {
       userObject["_id"] = user._id;
       userObject["username"] = user.username;
       userObject["__v"] = user.__v;
-      // userObject[user.username] = user._id;
       userArray.push(userObject);
     });
-    console.log(userArray);
+    // console.log(userArray);
     res.send(userArray);
   });
 });
 
 app.post("/api/users/:_id/exercises", async (req, res) => {
-  let _id = req.body[":_id"];
-  let exercise = {};
+  const { description, duration, date } = req.body;
+  let userId = req.body[":_id"];
+  // let date = req.body.date;
+  // let exercise = {};
   let user_username;
+  let inputDate;
 
-  exercise["description"] = req.body.description;
-  exercise["duration"] = req.body.duration;
+  // exercise["description"] = req.body.description;
+  // exercise["duration"] = req.body.duration;
 
-  if (req.body.date === '') {
-    exercise["date"] = moment().format('DDD MMMM DD YYYY');
+  if (!date || date == '') {
+    // Date Formatting
+    inputDate = new Date().toUTCString().split(" ");
+    inputDate[0] = inputDate[0].slice(0,3)
+    let a = inputDate[2];
+    inputDate[2] = inputDate[1];
+    inputDate[1] = a;
+    inputDate = inputDate.slice(0,4).join(" ");
+    exercise["date"] = inputDate;
+    // console.log(inputDate);
+
   } else {
-    exercise["date"] = moment(req.body.date).format('DDD MMMM DD YYYY');
+    // Date Formatting
+    inputDate = new Date(date).toUTCString().split(" ");
+    inputDate[0] = inputDate[0].slice(0,3)
+    let a = inputDate[2];
+    inputDate[2] = inputDate[1];
+    inputDate[1] = a;
+    inputDate = inputDate.slice(0,4).join(" ");
+
+    // exercise["date"] = inputDate;
   };
 
-  await User.findById(_id, (err, user) => {
+  if (inputDate == "Invalid Date") {
+    return res.send("Invalid Date");
+  }
+
+  await User.findById(userId, (err, user) => {
     if (err) { 
       console.log(err);
       res.status(400)
@@ -125,34 +147,48 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
       res.status(404);
       res.json({
         success: false,
-        message: `Cannot find an User with the userId`
+        message: `Cannot find a user with the userId: ${userId}`
         });
       res.end();
       return
     }
     user_username = user.username;
+    let exercise = {
+      description: description,
+      duration: parseInt(duration),
+      date: inputDate
+    };
 
     // Add new exercise
     user.log.push(exercise);
 
     // Save the updated user
     user.save((err, updatedUser) => {
-      if (err) return console.log(err);
+      if (err) return console.error(err);
+      let output = {
+        username: user_username,
+        description: description, 
+        duration: parseInt(duration),
+        _id: userId,
+        date: inputDate
+      };
+      return res.json(output);
     });
   });
-
   // Return user object with exercise fields added
-  await res.json({
-    "username" : user_username,
-    "_id" : _id,
-    "date" : exercise["date"],
-    "duration" : exercise["duration"],
-    "description" : exercise["description"]
-    });
+  // Maybe needs AWAIT
+  // res.json({
+  //   "username" : user_username,
+  //   "_id" : _id,
+  //   "date" : exercise["date"],
+  //   "duration" : exercise["duration"],
+  //   "description" : exercise["description"]
+  //   });
 });
 
 //  GET /api/users/:_id/logs?[&from][&to][&limit]
-app.get("/api/users/:_id/logs&:from?&:to?&:limit?", async (req, res) => {
+// &:from?&:to?&:limit?
+app.get("/api/users/:_id/logs", async (req, res) => {
   let _id = req.params["_id"];
   console.log(req.params);
   let userLog;
