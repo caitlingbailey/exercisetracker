@@ -259,12 +259,16 @@ app.post('/api/users/:_id/exercises', (req, res) => {
 // &:from?&:to?&:limit?
 app.get("/api/users/:_id/logs", async (req, res) => {
   let _id = req.params["_id"];
-  console.log(req.params);
-  let userUsername;
-  let outputLog = [];
+  let from = req.query.from ? new Date(req.query.from) : 0;
+	let to = req.query.to ? new Date(req.query.to) : new Date();
+	let limit = req.query.limit;
 
   await User.findById(_id, (err, user) => {
     Exercise.find({userId : _id})
+    .where('date')
+    .gte(from)
+    .lte(to)
+    .limit(parseInt(limit))
     .exec((err, exerciseList) => {
       if (err) return res.json({ error: err });
       if (!user) return res.json({ error: "No user found"});
