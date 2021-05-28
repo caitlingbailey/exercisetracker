@@ -12,6 +12,25 @@ app.use(cors())
 app.use(express.static('public'))
 app.use(bodyParser.urlencoded({extended: false}));
 
+// Error Handling middleware
+// app.use((err, req, res, next) => {
+//   let errCode, errMessage
+
+//   if (err.errors) {
+//     // mongoose validation error
+//     errCode = 400 // bad request
+//     const keys = Object.keys(err.errors)
+//     // report the first validation error
+//     errMessage = err.errors[keys[0]].message
+//   } else {
+//     // generic or custom error
+//     errCode = err.status || 500
+//     errMessage = err.message || 'Internal Server Error'
+//   }
+//   res.status(errCode).type('txt')
+//     .send(errMessage)
+// })
+
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/views/index.html')
 });
@@ -38,14 +57,15 @@ const logSchema = new Schema({
     required: true
   },
   date: {
-    type: Date
+    type: String
   }
 });
 
 const userSchema = new Schema({
   username: { 
     type: String, 
-    required: true },
+    required: true,
+    unique: true },
   count: {
     type: Number, 
     default: 0},
@@ -67,18 +87,50 @@ const userSchema = new Schema({
 
 // Create instance of new schema
 const User = mongoose.model("users", userSchema);
+const {ObjectId} = require('mongodb');
+
 
 // Listen to username input
 app.post("/api/users", async (req, res) => {
   const userName = req.body.username;
 
-  createUser(req.body.username);
+  if (!userName) {
+    res.json({
+      success: false,
+      message: `Please enter a username`
+    });
+    // console.log("Please enter a username");
+  };
+
+  createUser(userName);
   let query = await User.findOne({username : userName});
 
   res.json({
     username : userName,
     _id : query._id.toString()});
 });
+
+const dateHandler = (date) => {
+  let inputDate;
+  if (date == null || date == "") {
+      inputDate = new Date().toUTCString().split(" ");
+      inputDate[0] = inputDate[0].slice(0,3)
+      let a = inputDate[2];
+      inputDate[2] = inputDate[1];
+      inputDate[1] = a;
+      inputDate = inputDate.slice(0,4).join(" ");
+  } else {
+    inputDate = new Date(date).toUTCString().split(" ");
+    inputDate[0] = inputDate[0].slice(0,3)
+    let a = inputDate[2];
+    inputDate[2] = inputDate[1];
+    inputDate[1] = a;
+    inputDate = inputDate.slice(0,4).join(" ");
+  };
+  return inputDate;
+};
+
+
 
 app.get("/api/users", (req, res) => {
   User.find({}, (err, users) => {
@@ -95,69 +147,42 @@ app.get("/api/users", (req, res) => {
   });
 });
 
-app.post("/api/users/:_id/exercises", async (req, res) => {
-  const { description, duration, date } = req.body;
-  let userId = req.body[":_id"];
-  // let date = req.body.date;
-  // let exercise = {};
-  let user_username;
-  let inputDate;
+app.post("/api/users/:_id/exercises", (req, res) => {
+  // Define variables
+  const data = req.body;
+  const date = data.date;
+  const userId = data[":_id"];
 
-  // exercise["description"] = req.body.description;
-  // exercise["duration"] = req.body.duration;
-
-  if (!date || date == '') {
-    // Date Formatting
-    inputDate = new Date().toUTCString().split(" ");
-    inputDate[0] = inputDate[0].slice(0,3)
-    let a = inputDate[2];
-    inputDate[2] = inputDate[1];
-    inputDate[1] = a;
-    inputDate = inputDate.slice(0,4).join(" ");
-    exercise["date"] = inputDate;
-    // console.log(inputDate);
-
-  } else {
-    // Date Formatting
-    inputDate = new Date(date).toUTCString().split(" ");
-    inputDate[0] = inputDate[0].slice(0,3)
-    let a = inputDate[2];
-    inputDate[2] = inputDate[1];
-    inputDate[1] = a;
-    inputDate = inputDate.slice(0,4).join(" ");
-
-    // exercise["date"] = inputDate;
+  // Check for errors
+  if (!data.description || !data.duration ) {
+    return res.json({ error: "Description and duration fields are required" });
   };
 
-  if (inputDate == "Invalid Date") {
-    return res.send("Invalid Date");
+  if (date == null || date == "") {
+    date = new Date().toDateString();
+  } else {
+    date = new Date(data.date).toDateString();
   }
+  console.log(date);
 
-  await User.findById(userId, (err, user) => {
-    if (err) { 
-      console.log(err);
-      res.status(400)
-      res.json({
-        success: false,
-        err
-      });
-    };
+  let exercise = {
+    description: data.description,
+    duration: parseInt(data.duration),
+    date: date
+  };
 
-    if (!user) {
-      res.status(404);
-      res.json({
-        success: false,
-        message: `Cannot find a user with the userId: ${userId}`
-        });
-      res.end();
-      return
-    }
+  User.findById(userId, (err, user) => {
+    if (err) return res.json({ error: "Invalid ID"});
+
+    // if (!user) {
+    //   res.json({
+    //     success: false,
+    //     message: `Cannot find a user with the userId: ${userId}`
+    //     });
+    //   return;
+    // };
+
     user_username = user.username;
-    let exercise = {
-      description: description,
-      duration: parseInt(duration),
-      date: inputDate
-    };
 
     // Add new exercise
     user.log.push(exercise);
@@ -165,26 +190,19 @@ app.post("/api/users/:_id/exercises", async (req, res) => {
     // Save the updated user
     user.save((err, updatedUser) => {
       if (err) return console.error(err);
-      let output = {
-        username: user_username,
-        description: description, 
-        duration: parseInt(duration),
-        _id: userId,
-        date: inputDate
-      };
-      return res.json(output);
+
+      // console.log(output);
+      return res.json({        
+        username: user.username,
+        description: data.description,
+        duration: parseInt( data.duration ),
+        _id: ObjectId(data._id), // must be of type ObjectId
+        date:  date
+      });
     });
   });
-  // Return user object with exercise fields added
-  // Maybe needs AWAIT
-  // res.json({
-  //   "username" : user_username,
-  //   "_id" : _id,
-  //   "date" : exercise["date"],
-  //   "duration" : exercise["duration"],
-  //   "description" : exercise["description"]
-  //   });
 });
+
 
 //  GET /api/users/:_id/logs?[&from][&to][&limit]
 // &:from?&:to?&:limit?
@@ -193,22 +211,34 @@ app.get("/api/users/:_id/logs", async (req, res) => {
   console.log(req.params);
   let userLog;
   let userUsername;
+  let outputLog = [];
 
   await User.findById(_id, (err, user) => {
     if (err) return console.log(err);
     userLog = user.log;
+
+    userLog.forEach((value, index, array) => {
+      let ex = {
+        description: value.description,
+        duration : value.duration,
+        date : dateHandler(value.date)
+      };
+      outputLog.push(ex);
+    });
     userUsername = user.username;
   });
+  // console.log("Output Log");
+  // console.log(outputLog);
 
   await res.json({
-    username : userUsername,
     _id : _id,
-    count : userLog.length,
-    log : userLog
+    username : userUsername,
+    count : outputLog.length,
+    log : outputLog
   });
 });
 
-// Method to create new URL
+// Method to create new User
 const createUser = async (userName, done) => {
   const newUser = new User({ username : userName });
   await newUser.save();
